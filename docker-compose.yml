@@ -36,15 +36,24 @@ services:
       elasticsearch:
         condition: service_healthy
     user: "0"
-    command: >
-      bash -c '
-        echo "Définition du mot de passe kibana_system";
-        until curl -s -X POST -u "elastic:${ELASTIC_PASSWORD}"
-          -H "Content-Type: application/json"
-          http://elasticsearch:9200/_security/user/kibana_system/_password
-          -d "{\"password\":\"${KIBANA_PASSWORD}\"}" | grep -q "^{}"; do sleep 5; done;
-        echo "OK";
-      '
+    # Forme liste (exec) : chaque élément est un argv, aucun découpage sur les
+    # espaces. Ne pas passer la commande sur plusieurs lignes sans "\": dans un
+    # scalar YAML replié (">"), les lignes plus indentées gardent leur retour à
+    # la ligne et bash les exécute alors comme des commandes distinctes.
+    command:
+      - bash
+      - -c
+      - |
+        echo "Définition du mot de passe kibana_system"
+        until curl -s -X POST -u "elastic:${ELASTIC_PASSWORD}" \
+              -H "Content-Type: application/json" \
+              http://elasticsearch:9200/_security/user/kibana_system/_password \
+              -d "{\"password\":\"${KIBANA_PASSWORD}\"}" | grep -q '^{}'
+        do
+          echo "Elasticsearch pas encore prêt, nouvelle tentative dans 5 s..."
+          sleep 5
+        done
+        echo "OK"
     restart: "no"
 
   kibana:
