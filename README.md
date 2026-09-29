@@ -8,6 +8,12 @@ docker compose up -d
 docker compose ps               # elasticsearch healthy, setup exited (0), kibana healthy
 ```
 
+Changement de clé : 
+````bash
+python3 -c "import secrets; print(secrets.token_hex(16))"   # clé KIBANA_ENCRYPTION_KEY ; Windows : python au lieu de python3
+# copier <la clé> dans le .env et changer les deux autres mots de passe
+```
+
 Environnement Python, macOS / Linux :
 
 ```bash
