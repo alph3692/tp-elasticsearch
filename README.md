@@ -37,3 +37,13 @@ python data/generate_offres.py  # -> data/offres.ndjson
 
 Kibana : <http://localhost:5601> (utilisateur `elastic`). Arrêt : `docker compose down`
 (ajoutez `-v` pour supprimer aussi les données).
+
+---
+# Pour avancer dans le TP - Accès Elastic
+
+sous cmd, executer : 
+```bash
+curl -u elastic:<Votre mot de passe> "http://localhost:9200/_cluster/health?pretty"  
+# attendu : "status" : "green"
+```
+Ouvrez http://localhost:5601, connectez-vous en elastic, puis Menu → Management → Dev Tools. C'est là que vous tapez les requêtes des parties 1, 3 et 4 ; Hoppscotch ou curl donnent le même résultat (voir « Outils pour envoyer les requêtes »).
