@@ -92,6 +92,27 @@ Pourquoi kibana ne demande pas de mot de passe ? on s'est authentifié une fois 
 
 ---
 # Partie 1 - Conceptes, CRUD et mapping
+
+## 1.1
+Version : `9.5.4` (`version.number` de `GET /`).  
+Noeuds : 1 (`es01`, `discovery.type=single-node`).
+Index commençant par un point : ce sont des index système / cachés (`.kibana*`, `.security*`, `.tasks` ...) utilisés par Kibana et les fonctionnalités de la stack. Ils n'apparaissent qu'avec `expand_wildcards=all`.
+
+## 1.2 Le CRUD  
+`_version` : 1 après le `PUT`, 2 après l'`_update`, 3 dans la réponse du `DELETE` (une suppression est aussi une écriture).  
+`POST essai/_doc` : Elasticsearch génère un `_id` aléatoire de 20 caractères (type base64 URL).
+L'index `essai` n'existait pas : il a été créé automatiquement au premier `PUT` (`action.auto_create_index`), avec un mapping dynamique.  
+
+## 1.3 Les pièges du mapping dynamique 
+`salaire` (`"45000"`) > `text` + sous-champ `salaire.keyword` : une chaîne reste une chaîne de caractère (la détection numérique est désactivée par défaut).  
+`publication` > `date` : la détection de date est active par défaut.  
+`actif` (`"true"`) > `text` + `keyword` également.
+Le document 2 est accepté car `52000` est converti en chaîne pour entrer dans un champ `text/keyword` (coercition).  
+Conséquence : tri et filtre portent sur `"100000" < "45000"` et `salaire > 50000`. Cela compare des chaînes caractère par caractère. Les moyennes sont impossibles. Seule solution : recréer l'index avec le bon type (+ réindexer).  
+
+## 1.4 Mapping explicite de l'index `offres`
+Erreur : `400`, `strict_dynamic_mapping_exception` — mapping set to strict, dynamic introduction of [champ_inconnu] within [_doc] is not allowed.  
+Intérêt en production : le schéma est un contrat ; une faute de frappe (vile au lieu de ville) ou un champ inattendu provoque une erreur visible au lieu de créer silencieusement un champ mal typé, qu'on ne pourrait plus corriger sans réindexer (et on évite l'explosion du nombre de champs).  
 ---
 # Partie 2 - Ingestion en Python
 ---
