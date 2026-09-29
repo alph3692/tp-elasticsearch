@@ -111,8 +111,10 @@ Le document 2 est accepté car `52000` est converti en chaîne pour entrer dans 
 Conséquence : tri et filtre portent sur `"100000" < "45000"` et `salaire > 50000`. Cela compare des chaînes caractère par caractère. Les moyennes sont impossibles. Seule solution : recréer l'index avec le bon type (+ réindexer).  
 
 ## 1.4 Mapping explicite de l'index `offres`  
+
 Erreur : `400`, `strict_dynamic_mapping_exception` — mapping set to strict, dynamic introduction of [champ_inconnu] within [_doc] is not allowed.  
 Intérêt en production : le schéma est un contrat ; une faute de frappe (vile au lieu de ville) ou un champ inattendu provoque une erreur visible au lieu de créer silencieusement un champ mal typé, qu'on ne pourrait plus corriger sans réindexer (et on évite l'explosion du nombre de champs).  
+
 ---
 # Partie 2 - Ingestion en Python
 ---
