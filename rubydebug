@@ -1,0 +1,6 @@
+[FATAL] 2026-10-03 10:39:57.126 [main] Logstash - Logstash stopped processing because of an error: (SystemExit) exit
+org.jruby.exceptions.SystemExit: (SystemExit) exit
+	at org.jruby.RubyKernel.exit(org/jruby/RubyKernel.java:976)
+	at org.jruby.RubyKernel.exit(org/jruby/RubyKernel.java:935)
+	at RUBY.run(/usr/share/logstash/vendor/bundle/jruby/3.4.0/gems/clamp-1.5.2/lib/clamp/command.rb:145)
+	at usr.share.logstash.lib.bootstrap.environment.<main>(/usr/share/logstash/lib/bootstrap/environment.rb:89)

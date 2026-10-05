@@ -21,14 +21,31 @@ MAPPINGS = {
     "properties": {
         "id": {"type": "keyword"},
         # TODO 1 : compléter le mapping des 12 autres champs (voir le tableau de l'énoncé)
-    },
+        "id": {"type": "keyword"},
+        "titre": {"type": "text", "analyzer": "french", "fields": {"brut": {"type": "keyword"}}},
+        "entreprise": {"type": "keyword"},
+        "description": {"type": "text", "analyzer": "french"},
+        "competences": {"type": "keyword", "fields": {"texte": {"type": "text"}}},
+        "ville": {"type": "keyword"},
+        "localisation": {"type": "geo_point"},
+        "contrat": {"type": "keyword"},
+        "teletravail": {"type": "keyword"},
+        "experience_annees": {"type": "integer"},
+        "salaire_min": {"type": "integer"},
+        "salaire_max": {"type": "integer"},
+        "date_publication": {"type": "date", "format": "strict_date"},
+        },
 }
 
 
 def lire_actions(fichier: Path) -> Iterator[dict]:
     """TODO 2 : générateur qui lit le fichier ligne à ligne et produit
     {"_index": INDEX, "_id": <id de l'offre>, "_source": <document>}."""
-    raise NotImplementedError
+    with fichier.open(encoding="utf-8") as f:
+        for ligne in f:
+            if ligne.strip():
+                doc = json.loads(ligne)
+                yield {"_index": INDEX, "_id": doc["id"], "_source": doc}
 
 
 def main() -> None:
@@ -44,6 +61,20 @@ def main() -> None:
     # TODO 4 : créer l'index s'il n'existe pas, avec SETTINGS et MAPPINGS
     # TODO 5 : ingérer avec helpers.bulk (chunk_size=1000, raise_on_error=False), afficher les erreurs
     # TODO 6 : rafraîchir l'index puis afficher le nombre de documents (es.count)
+
+    if args.reset:
+        es.indices.delete(index=INDEX, ignore_unavailable=True)
+    if not es.indices.exists(index=INDEX):
+        es.indices.create(index=INDEX, settings=SETTINGS, mappings=MAPPINGS)
+        print(f"Index '{INDEX}' créé")
+
+    ok, erreurs = helpers.bulk(es, lire_actions(args.fichier), chunk_size=1000, raise_on_error=False)
+    for err in erreurs[:5]:
+        print("Erreur :", err)
+
+    es.indices.refresh(index=INDEX)
+    total = es.count(index=INDEX)["count"]
+    print(f"{ok} documents indexés, {len(erreurs)} erreurs, {total} documents dans '{INDEX}'")
 
 
 if __name__ == "__main__":

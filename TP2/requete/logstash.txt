@@ -1,0 +1,45 @@
+
+# Mise en place — compte Logstash - 
+# (mot de passe JAMAIS écrit ici : il est dans .env -> LOGSTASH_INTERNAL_PASSWORD)
+
+GET offres/_count
+
+POST _security/role/logstash_writer
+{
+  "cluster": ["monitor", "manage_index_templates"],
+  "indices": [
+    { "names": ["offres", "logs-web-*"],
+      "privileges": ["write", "create", "create_index", "auto_configure"] }
+  ]
+}
+
+POST _security/user/logstash_internal
+{ "password": "<LOGSTASH_INTERNAL_PASSWORD>", "roles": ["logstash_writer"],
+  "full_name": "Logstash - ingestion" }
+
+# Vérifications
+GET _security/role/logstash_writer
+GET _security/user/logstash_internal
+
+# Partie 1 - Offfres
+
+GET offres/_doc/OFF-00002          # relever _version avant / après chaque démarrage
+GET offres/_count                  # 5000 à chaque fois
+
+# Partie 2 — DLQ
+GET offres/_doc/OFF-99999          # found: false
+GET offres/_count                  # toujours 5000
+
+# Partie 3 - data stream 
+
+GET _data_stream/logs-web-default
+GET logs-web-default/_count
+GET logs-web-default/_count
+{ "query": { "term": { "tags": "_grokparsefailure" } } }
+GET logs-web-default/_search
+{ "size": 1, "sort": [{ "@timestamp": "asc" }] }
+GET logs-web-default/_mapping/field/http.response.status_code
+GET logs-web-default/_settings?filter_path=*.settings.index.mode
+
+# Repartir d'un état propre (après docker compose stop logstash)
+DELETE _data_stream/logs-web-default

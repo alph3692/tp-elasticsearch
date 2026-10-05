@@ -1,0 +1,185 @@
+# Welcome to the Dev Tools Console!
+#
+# You can use Console to explore the Elasticsearch API. See the Elasticsearch API reference to learn more:
+# https://www.elastic.co/guide/en/elasticsearch/reference/current/rest-apis.html
+#
+# Here are a few examples to get you started.
+
+
+# Create an index
+PUT /my-index
+
+
+# Add a document to my-index
+POST /my-index/_doc
+{
+    "id": "park_rocky-mountain",
+    "title": "Rocky Mountain",
+    "description": "Bisected north to south by the Continental Divide, this portion of the Rockies has ecosystems varying from over 150 riparian lakes to montane and subalpine forests to treeless alpine tundra."
+}
+
+
+# Perform a search in my-index
+GET /my-index/_search?q="rocky mountain"
+
+GET /
+GET _cat/nodes?v
+GET _cat/indices?v&expand_wildcards=all
+
+
+# Exercice 3.1 — Analyseurs
+
+POST _analyze
+{ "analyzer": "standard", "text": "Les développeuses travaillaient sur l'analyse des données" }
+
+POST _analyze
+{ "analyzer": "french", "text": "Les développeuses travaillaient sur l'analyse des données" }
+
+POST _analyze
+{ "analyzer": "standard", "text": ["donnée", "données"] }
+
+POST _analyze
+{ "analyzer": "french", "text": ["donnée", "données"] }
+
+POST offres/_analyze
+{ "field": "description", "text": "projets bancaires" }
+
+# Exercice 3.2 — match contre term
+
+GET offres/_search
+{ "query": { "match": { "description": "projets bancaires" } } }
+
+# 0 résultat : "paris" != "Paris" (keyword = sensible à la casse)
+GET offres/_search
+{ "query": { "term": { "ville": "paris" } } }
+
+# 0 résultat : titre est un champ text, indexé en tokens ("data", "engineer", "senior")
+GET offres/_search
+{ "query": { "term": { "titre": "Data Engineer Senior" } } }
+
+# --- Corrections ---
+
+GET offres/_search
+{ "query": { "term": { "ville": "Paris" } } }
+
+GET offres/_search
+{ "query": { "term": { "titre.brut": "Data Engineer Senior" } } }
+
+# operator and : tous les tokens doivent être présents
+GET offres/_search
+{
+  "query": {
+    "match": { "description": { "query": "projets bancaires", "operator": "and" } }
+  }
+}
+
+# Exercice 3.3 — multi_match, fuzziness, pondération
+
+# a) sans tolérance : "kubernetis" n'existe pas dans l'index
+
+GET offres/_search
+{
+  "query": {
+    "multi_match": {
+      "query": "kubernetis terraform",
+      "fields": ["titre", "competences.texte", "description"]
+    }
+  }
+}
+
+# b) avec fuzziness
+
+GET offres/_search
+{
+  "query": {
+    "multi_match": {
+      "query": "kubernetis terraform",
+      "fields": ["titre", "competences.texte", "description"],
+      "fuzziness": "AUTO"
+    }
+  }
+}
+
+# c) avec poids sur le titre
+
+GET offres/_search
+{
+  "query": {
+    "multi_match": {
+      "query": "kubernetis terraform",
+      "fields": ["titre^3", "competences.texte", "description"],
+      "fuzziness": "AUTO"
+    }
+  }
+}
+
+# Exercice 3.4 — Requête bool
+
+GET offres/_search
+{
+  "query": {
+    "bool": {
+      "must": [
+        { "multi_match": { "query": "données", "fields": ["titre", "description"] } }
+      ],
+      "filter": [
+        { "term":  { "contrat": "CDI" } },
+        { "terms": { "ville": ["Montpellier", "Toulouse"] } },
+        { "range": { "salaire_max": { "gte": 50000 } } }
+      ],
+      "must_not": [
+        { "term": { "teletravail": "aucun" } }
+      ],
+      "should": [
+        { "term": { "competences": "Elasticsearch" } }
+      ]
+    }
+  }
+}
+
+# Exercice 3.5 — Recherche géographique
+
+GET offres/_search
+{
+  "query": { "bool": { "filter": { "geo_distance": {
+    "distance": "20km", "localisation": { "lat": 43.6108, "lon": 3.8767 } } } } },
+  "sort": [ { "_geo_distance": {
+    "localisation": { "lat": 43.6108, "lon": 3.8767 }, "order": "asc", "unit": "km" } } ]
+}
+
+# Exercice 3.6 — Pagination et surlignage
+
+GET offres/_search
+{
+  "from": 5,
+  "size": 5,
+  "_source": ["titre", "entreprise", "ville"],
+  "query": {
+    "bool": {
+      "must": [
+        { "multi_match": { "query": "données", "fields": ["titre", "description"] } }
+      ],
+      "filter": [
+        { "term":  { "contrat": "CDI" } },
+        { "terms": { "ville": ["Montpellier", "Toulouse"] } },
+        { "range": { "salaire_max": { "gte": 50000 } } }
+      ],
+      "must_not": [ { "term": { "teletravail": "aucun" } } ],
+      "should":   [ { "term": { "competences": "Elasticsearch" } } ]
+    }
+  },
+  "highlight": {
+    "fields": { "description": {} , "titre": {} }
+  }
+}
+
+# Au-delà de 10 000 : point in time + search_after
+
+POST offres/_pit?keep_alive=1m
+
+GET _search
+{
+  "size": 100,
+  "pit":  { "id": "<id_renvoyé>", "keep_alive": "1m" },
+  "sort": [ { "date_publication": "desc" }, { "id": "asc" } ]
+}

@@ -1,0 +1,19 @@
+# Data view "Logs web" : motif logs-web-*, champ temporel @timestamp
+# Période ABSOLUE : 23/09/2026 00:00 -> 30/09/2026 00:00 (heure de Paris)
+# NB : ES|QL travaille en UTC (Paris = UTC+2 en septembre).
+
+# 4.1 - Vue d'ensemble
+
+FROM logs-web-default
+| STATS n = COUNT(*) BY http.response.status_code
+| SORT n DESC
+
+FROM logs-web-default
+| STATS n = COUNT(*) BY http.request.method
+
+FROM logs-web-default
+| STATS total = COUNT(*)
+| EVAL moyenne_par_jour = total / 7.0
+
+# 4.2
+
