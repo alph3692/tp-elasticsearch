@@ -16,4 +16,103 @@ FROM logs-web-default
 | EVAL moyenne_par_jour = total / 7.0
 
 # 4.2
+# KQL (Discover) : http.response.status_code >= 500
 
+# 1. Par heure
+FROM logs-web-default
+| WHERE http.response.status_code >= 500
+| STATS erreurs = COUNT(*) BY heure = BUCKET(@timestamp, 1 hour)
+| SORT erreurs DESC
+| LIMIT 10
+
+# 1 bis. Zoom par 5 minutes autour du pic (UTC)
+FROM logs-web-default
+| WHERE @timestamp >= "2026-09-28T11:30:00Z" AND @timestamp < "2026-09-28T13:30:00Z"
+  AND http.response.status_code >= 500
+| STATS erreurs = COUNT(*) BY tranche = BUCKET(@timestamp, 5 minutes)
+| SORT tranche
+
+# 2. URL touchées / épargnées pendant le créneau
+FROM logs-web-default
+| WHERE @timestamp >= "2026-09-28T12:00:00Z" AND @timestamp < "2026-09-28T12:45:00Z"
+| EVAL zone = CASE(url.original LIKE "/api/*", "api",
+                   url.original LIKE "/offres/*", "offres",
+                   url.original LIKE "/recherche*", "recherche",
+                   url.original LIKE "/static/*", "static",
+                   "accueil")
+| STATS n = COUNT(*) BY zone, http.response.status_code
+| SORT zone, http.response.status_code
+
+# 3. Volume et durée
+FROM logs-web-default
+| WHERE http.response.status_code == 503
+| STATS n = COUNT(*), debut = MIN(@timestamp), fin = MAX(@timestamp)
+| EVAL duree_min = DATE_DIFF("minute", debut, fin)
+
+# 4. Comportement des clients : volume d'appels API par quart d'heure
+FROM logs-web-default
+| WHERE url.original LIKE "/api/*"
+| STATS appels = COUNT(*) BY q = BUCKET(@timestamp, 15 minutes)
+| SORT appels DESC
+| LIMIT 10
+
+# 4.3 — L'activité suspecte
+# KQL : http.response.status_code : 404
+
+FROM logs-web-default
+| WHERE http.response.status_code == 404
+| STATS n = COUNT(*) BY source.address
+| SORT n DESC
+| LIMIT 5
+
+FROM logs-web-default
+| WHERE source.address == "203.0.113.66" AND http.response.status_code == 404
+| STATS n = COUNT(*), debut = MIN(@timestamp), fin = MAX(@timestamp)
+
+FROM logs-web-default
+| WHERE source.address == "203.0.113.66" AND http.response.status_code == 404
+| STATS n = COUNT(*) BY url.original, user_agent.original
+| SORT n DESC
+
+# KQL : user_agent.original : *zgrab*
+
+# Les autres 404
+FROM logs-web-default
+| WHERE http.response.status_code == 404 AND source.address != "203.0.113.66"
+| EVAL zone = CASE(url.original LIKE "/offres/*", "offres", "autre")
+| STATS n = COUNT(*), offres_distinctes = COUNT_DISTINCT(labels.offre_id) BY zone
+
+
+# 4.4 — Offres les plus consultées
+FROM logs-web-default
+| WHERE http.request.method == "GET" AND http.response.status_code == 200
+  AND labels.offre_id IS NOT NULL
+| STATS vues = COUNT(*) BY labels.offre_id
+| SORT vues DESC, labels.offre_id ASC
+| LIMIT 10
+
+# Dev Tools : une seule requête sur l'index offres
+GET offres/_search
+{
+  "size": 10,
+  "_source": ["titre", "ville", "contrat"],
+  "query": { "ids": { "values": [
+    "OFF-04662", "OFF-01153", "OFF-03141", "OFF-00289", "OFF-00901",
+    "OFF-01275", "OFF-01660", "OFF-02899", "OFF-03126", "OFF-03145"
+  ] } }
+}
+
+
+# 4.5 — Le public
+FROM logs-web-default
+| STATS n = COUNT(*) BY user_agent.os.name
+| SORT n DESC
+
+FROM logs-web-default
+| EVAL mobile = CASE(user_agent.os.name IN ("iOS", "Android"), 1, 0)
+| STATS part_mobile_pct = SUM(mobile) * 100.0 / COUNT(*)
+
+FROM logs-web-default
+| STATS n = COUNT(*) BY user_agent.name
+| SORT n DESC
+| LIMIT 3
